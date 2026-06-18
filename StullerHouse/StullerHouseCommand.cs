@@ -99,7 +99,7 @@ namespace StullerHouse
             var doorX = insertionPt.X + (width - doorWidth) / 2;
             var doorZ = insertionPt.Z;
             
-            Plane doorPlane = new Plane(new Point3d(doorX, insertionPt.Y, doorZ), Vector3d.XAxis, Vector3d.ZAxis);
+            Plane doorPlane = new Plane(new Point3d(doorX, insertionPt.Y - 0.01, doorZ), Vector3d.XAxis, Vector3d.ZAxis);
             Rectangle3d doorRect = new Rectangle3d(doorPlane, doorWidth, doorHeight);
             Brep[] doorBreps = Brep.CreatePlanarBreps(new Curve[] { doorRect.ToNurbsCurve() }, doc.ModelAbsoluteTolerance);
             if (doorBreps == null || doorBreps.Length == 0)
@@ -109,45 +109,89 @@ namespace StullerHouse
                 }
             Brep doorBrep = doorBreps[0];
 
+            //Making a cutter for body of house so door does not clip
+            Box doorCutter = new Box(Plane.WorldXY,
+                new Interval(doorX, doorX + doorWidth),
+                new Interval(insertionPt.Y - 0.1, insertionPt.Y + 0.1),
+                new Interval(doorZ, doorZ + doorHeight));
+            Brep doorCutterBrep = doorCutter.ToBrep();
+
+
+
 
             //Create  Left windows for house
-            double windowAWidth = width * 0.12;
-            double windowAHeight = height * 0.3;
+            double windowLWidth = width * 0.12;
+            double windowLHeight = height * 0.3;
             //Making this be between the door and side of house
-            var windowAX = insertionPt.X + (width - windowAWidth) / 6;
+            var windowLX = insertionPt.X + (width - windowLWidth) / 6;
 
-            var windowAZ = insertionPt.Z + height * 0.45;
+            var windowLZ = insertionPt.Z + height * 0.45;
 
-            Plane windowAPlane = new Plane(new Point3d(windowAX, insertionPt.Y, windowAZ), Vector3d.XAxis, Vector3d.ZAxis);
-            Rectangle3d windowARect = new Rectangle3d(windowAPlane, windowAWidth, windowAHeight);
-            Brep[] windowABreps = Brep.CreatePlanarBreps(new Curve[] { windowARect.ToNurbsCurve() }, doc.ModelAbsoluteTolerance);
-            if (windowABreps == null || windowABreps.Length == 0)
+            Plane windowLPlane = new Plane(new Point3d(windowLX, insertionPt.Y - 0.01, windowLZ), Vector3d.XAxis, Vector3d.ZAxis);
+            Rectangle3d windowLRect = new Rectangle3d(windowLPlane, windowLWidth, windowLHeight);
+            Brep[] windowLBreps = Brep.CreatePlanarBreps(new Curve[] { windowLRect.ToNurbsCurve() }, doc.ModelAbsoluteTolerance);
+            if (windowLBreps == null || windowLBreps.Length == 0)
             {
                 RhinoApp.WriteLine("Failed to create door.");
                 return Result.Failure;
             }
-            Brep windowABrep = windowABreps[0];
+            Brep windowLBrep = windowLBreps[0];
+
+            //Making window cutter for left window
+            Box windowCutterL = new Box(
+                Plane.WorldXY,
+                new Interval(windowLX, windowLX + windowLWidth),
+                new Interval(insertionPt.Y - 0.1, insertionPt.Y + 0.1),
+                new Interval(windowLZ, windowLZ + windowLHeight)
+            );
+            Brep windowCutterBrep = windowCutterL.ToBrep();
 
 
             //Create Rightsode windows for house
-            double windowBWidth = width * 0.12;
-            double windowBHeight = height * 0.3;
+            double windowRWidth = width * 0.12;
+            double windowRHeight = height * 0.3;
             //Making this be between the door and side of house
-            var windowBX = insertionPt.X + (width - windowBWidth) * .84;
+            var windowRX = insertionPt.X + (width - windowRWidth) * .84;
 
-            var windowBZ = insertionPt.Z + height * 0.45;
+            var windowRZ = insertionPt.Z + height * 0.45;
 
-            Plane windowBPlane = new Plane(new Point3d(windowBX, insertionPt.Y, windowBZ), Vector3d.XAxis, Vector3d.ZAxis);
-            Rectangle3d windowBRect = new Rectangle3d(windowBPlane, windowBWidth, windowBHeight);
-            Brep[] windowBBreps = Brep.CreatePlanarBreps(new Curve[] { windowBRect.ToNurbsCurve() }, doc.ModelAbsoluteTolerance);
-            if (windowBBreps == null || windowBBreps.Length == 0)
+            Plane windowRPlane = new Plane(new Point3d(windowRX, insertionPt.Y - 0.01, windowRZ), Vector3d.XAxis, Vector3d.ZAxis);
+            Rectangle3d windowRRect = new Rectangle3d(windowRPlane, windowRWidth, windowRHeight);
+            Brep[] windowRBreps = Brep.CreatePlanarBreps(new Curve[] { windowRRect.ToNurbsCurve() }, doc.ModelAbsoluteTolerance);
+            if (windowRBreps == null || windowRBreps.Length == 0)
             {
                 RhinoApp.WriteLine("Failed to create door.");
                 return Result.Failure;
             }
-            Brep windowBBrep = windowBBreps[0];
+            Brep windowRBrep = windowRBreps[0];
 
+            //Making window cutter for right window
+            Box windowCutterR = new Box(
+                Plane.WorldXY,
+                new Interval(windowRX, windowRX + windowRWidth),
+                new Interval(insertionPt.Y - 0.1, insertionPt.Y + 0.1),
+                new Interval(windowRZ, windowRZ + windowRHeight)
+            );
+            Brep windowCutterRBrep = windowCutterR.ToBrep();
 
+            //Cutting out the door and windows
+            Brep[] cutters = new Brep[] { doorCutterBrep, windowCutterBrep, windowCutterRBrep };
+            Brep[] inputSet0 = new Brep[] { bodyBrep };
+
+            Brep[] result = Brep.CreateBooleanDifference(
+                inputSet0,
+                cutters,
+                doc.ModelAbsoluteTolerance
+            );
+
+            if (result != null && result.Length > 0)
+            {
+                bodyBrep = result[0]; 
+            }
+            else
+            {
+                RhinoApp.WriteLine("Boolean difference failed — check that all Breps are closed solids");
+            }
 
             //Create chimney for house
             double chimneyWidth = width * 0.12;
@@ -190,9 +234,9 @@ namespace StullerHouse
             doorAttrs.ObjectColor = System.Drawing.Color.Aquamarine;
 
             //Windows color
-            var windowAttrs = new Rhino.DocObjects.ObjectAttributes();
-            windowAttrs.ColorSource = Rhino.DocObjects.ObjectColorSource.ColorFromObject;
-            windowAttrs.ObjectColor = System.Drawing.Color.SkyBlue;
+            var windowLttrs = new Rhino.DocObjects.ObjectAttributes();
+            windowLttrs.ColorSource = Rhino.DocObjects.ObjectColorSource.ColorFromObject;
+            windowLttrs.ObjectColor = System.Drawing.Color.SkyBlue;
 
 
             doc.Objects.AddBrep(bodyBrep, bodyAttrs);
@@ -204,8 +248,8 @@ namespace StullerHouse
             doc.Objects.AddBrep(joinedRoof[0], roofAttrs);
             doc.Objects.AddBrep(doorBrep, doorAttrs);
             doc.Objects.AddBrep(chimneyBrep, chimneyAttrs);
-            doc.Objects.AddBrep(windowABrep, windowAttrs);
-            doc.Objects.AddBrep(windowBBrep, windowAttrs);
+            doc.Objects.AddBrep(windowLBrep, windowLttrs);
+            doc.Objects.AddBrep(windowRBrep, windowLttrs);
             doc.Views.Redraw();
             return Result.Success;
         }
