@@ -2,6 +2,7 @@ using Rhino;
 using Rhino.Commands;
 using Rhino.Geometry;
 using Rhino.Input;
+using System.ComponentModel;
 
 
 namespace StullerHouse
@@ -167,17 +168,44 @@ namespace StullerHouse
             Brep chimneyBrep = chimneyBox.ToBrep();
 
 
-            doc.Objects.AddBrep(bodyBrep);
+            //Adding in colors for the fun of it:
+            //House body color
+            var bodyAttrs = new Rhino.DocObjects.ObjectAttributes();
+            bodyAttrs.ColorSource = Rhino.DocObjects.ObjectColorSource.ColorFromObject;
+            bodyAttrs.ObjectColor = System.Drawing.Color.BlanchedAlmond;
+
+            //Roof color
+            var roofAttrs = new Rhino.DocObjects.ObjectAttributes();
+            roofAttrs.ColorSource = Rhino.DocObjects.ObjectColorSource.ColorFromObject;
+            roofAttrs.ObjectColor = System.Drawing.Color.Firebrick;
+
+            //Chimney color
+            var chimneyAttrs = new Rhino.DocObjects.ObjectAttributes();
+            chimneyAttrs.ColorSource = Rhino.DocObjects.ObjectColorSource.ColorFromObject;
+            chimneyAttrs.ObjectColor = System.Drawing.Color.PapayaWhip;
+
+            //Door color
+            var doorAttrs = new Rhino.DocObjects.ObjectAttributes();
+            doorAttrs.ColorSource = Rhino.DocObjects.ObjectColorSource.ColorFromObject;
+            doorAttrs.ObjectColor = System.Drawing.Color.Aquamarine;
+
+            //Windows color
+            var windowAttrs = new Rhino.DocObjects.ObjectAttributes();
+            windowAttrs.ColorSource = Rhino.DocObjects.ObjectColorSource.ColorFromObject;
+            windowAttrs.ObjectColor = System.Drawing.Color.SkyBlue;
+
+
+            doc.Objects.AddBrep(bodyBrep, bodyAttrs);
             if (joinedRoof == null || joinedRoof.Length == 0)
             {
                 RhinoApp.WriteLine("Failed to join roof.");
                 return Result.Failure;
             }
-            doc.Objects.AddBrep(joinedRoof[0]);
-            doc.Objects.AddBrep(doorBrep);
-            doc.Objects.AddBrep(chimneyBrep);
-            doc.Objects.AddBrep(windowABrep);
-            doc.Objects.AddBrep(windowBBrep);
+            doc.Objects.AddBrep(joinedRoof[0], roofAttrs);
+            doc.Objects.AddBrep(doorBrep, doorAttrs);
+            doc.Objects.AddBrep(chimneyBrep, chimneyAttrs);
+            doc.Objects.AddBrep(windowABrep, windowAttrs);
+            doc.Objects.AddBrep(windowBBrep, windowAttrs);
             doc.Views.Redraw();
             return Result.Success;
         }
