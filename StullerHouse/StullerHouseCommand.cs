@@ -109,7 +109,7 @@ namespace StullerHouse
             Brep doorBrep = doorBreps[0];
 
 
-            //Create windows for house
+            //Create  Left windows for house
             double windowAWidth = width * 0.12;
             double windowAHeight = height * 0.3;
             //Making this be between the door and side of house
@@ -126,6 +126,26 @@ namespace StullerHouse
                 return Result.Failure;
             }
             Brep windowABrep = windowABreps[0];
+
+
+            //Create Rightsode windows for house
+            double windowBWidth = width * 0.12;
+            double windowBHeight = height * 0.3;
+            //Making this be between the door and side of house
+            var windowBX = insertionPt.X + (width - windowBWidth) * .84;
+
+            var windowBZ = insertionPt.Z + height * 0.45;
+
+            Plane windowBPlane = new Plane(new Point3d(windowBX, insertionPt.Y, windowBZ), Vector3d.XAxis, Vector3d.ZAxis);
+            Rectangle3d windowBRect = new Rectangle3d(windowBPlane, windowBWidth, windowBHeight);
+            Brep[] windowBBreps = Brep.CreatePlanarBreps(new Curve[] { windowBRect.ToNurbsCurve() }, doc.ModelAbsoluteTolerance);
+            if (windowBBreps == null || windowBBreps.Length == 0)
+            {
+                RhinoApp.WriteLine("Failed to create door.");
+                return Result.Failure;
+            }
+            Brep windowBBrep = windowBBreps[0];
+
 
 
             //Create chimney for house
@@ -157,6 +177,7 @@ namespace StullerHouse
             doc.Objects.AddBrep(doorBrep);
             doc.Objects.AddBrep(chimneyBrep);
             doc.Objects.AddBrep(windowABrep);
+            doc.Objects.AddBrep(windowBBrep);
             doc.Views.Redraw();
             return Result.Success;
         }
