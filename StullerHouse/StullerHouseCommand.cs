@@ -45,14 +45,18 @@ namespace StullerHouse
 
 
                 GetObject go = new GetObject();
-                go.SetCommandPrompt("Select surfaces, polysurfaces, or meshes");
+                go.SetCommandPrompt("Adjust dimensions and press Enter to confirm");
 
                 go.AddOptionDouble("Width", ref OptionWidth);
                 go.AddOptionDouble("Depth", ref OptionDepth);
                 go.AddOptionDouble("Height", ref OptionHeight);
                 go.AddOptionDouble("RoofHeight", ref OptionRoofHeight);
+                go.AcceptNothing(true);
 
-                while(true)
+                var chosenBody = new Rhino.Geometry.Brep();
+                var chosenRoof = new Rhino.Geometry.Brep();
+
+                while (true)
                 { 
                     var previewResult = go.Get();
 
@@ -72,13 +76,19 @@ namespace StullerHouse
                             continue;
                         }
 
-                    else if (previewResult == GetResult.Object)
+                    // TODO: Update this condition to also handle GetResult.Nothing —
+                    //       pressing Enter with no selection should confirm just like selecting an object.
+                    //       Combine both cases using || in a single condition.
+                    else if (previewResult == GetResult.Object || previewResult == GetResult.Nothing)
                         {
                             width = OptionWidth.CurrentValue;
                             depth = OptionDepth.CurrentValue;
                             height = OptionHeight.CurrentValue;
                             roofHeight = OptionRoofHeight.CurrentValue;
 
+                            chosenBody = BuildBodyPreview(insertionPt, width, depth, height);
+
+                            chosenRoof = BuildRoofPreview(insertionPt, width, depth, height, roofHeight, doc);
                             break;
                         }
 
@@ -95,40 +105,7 @@ namespace StullerHouse
                     return Result.Failure;
                 }
 
-                // Build final geometry for the document
-                Plane basePlane = Plane.WorldXY;
-                basePlane.Origin = insertionPt;
-                Box bodyBox = new Box(basePlane,
-                    new Interval(0, width),
-                    new Interval(0, depth),
-                    new Interval(0, height));
-                Brep bodyBrep = bodyBox.ToBrep();
-
-                double overhang = width * .17;
-                Point3d p1 = new Point3d(insertionPt.X - overhang, insertionPt.Y, insertionPt.Z + height);
-                Point3d p2 = new Point3d(insertionPt.X + width + overhang, insertionPt.Y, insertionPt.Z + height);
-                Point3d p3 = new Point3d(insertionPt.X + width / 2.0, insertionPt.Y, insertionPt.Z + height + roofHeight);
-                Polyline triangle = new Polyline { p1, p2, p3, p1 };
-                Curve roofProfile = triangle.ToNurbsCurve();
-                Brep[] roofBreps = Brep.CreatePlanarBreps(new Curve[] { roofProfile }, doc.ModelAbsoluteTolerance);
-                Brep frontCap = roofBreps[0];
-                Point3d p4 = new Point3d(p1.X, p1.Y + depth, p1.Z);
-                Point3d p5 = new Point3d(p2.X, p2.Y + depth, p2.Z);
-                Point3d p6 = new Point3d(p3.X, p3.Y + depth, p3.Z);
-                Polyline backTriangle = new Polyline { p4, p5, p6, p4 };
-                Curve backProfile = backTriangle.ToNurbsCurve();
-                Brep[] backCapBreps = Brep.CreatePlanarBreps(new Curve[] { backProfile }, doc.ModelAbsoluteTolerance);
-                Brep backCap = backCapBreps[0];
-                Vector3d extrusionDir = new Vector3d(0, depth, 0);
-                Surface roofSurface = Surface.CreateExtrusion(roofProfile, extrusionDir);
-                if (roofSurface == null)
-                {
-                    RhinoApp.WriteLine("Failed to create roof.");
-                    return Result.Failure;
-                }
-                Brep houseRoof = roofSurface.ToBrep();
-                Brep[] joinedRoof = Brep.JoinBreps(new Brep[] { houseRoof, frontCap, backCap }, doc.ModelAbsoluteTolerance);
-
+               
                 //Create door for house
                 double doorWidth = width * 0.2;
                 double doorHeight = height * 0.55;
@@ -200,9 +177,9 @@ namespace StullerHouse
 
                 //Cutting out the door and windows
                 Brep[] cutters = new Brep[] { doorCutterBrep, windowCutterBrep, windowCutterRBrep };
-                Brep[] result = Brep.CreateBooleanDifference(new Brep[] { bodyBrep }, cutters, doc.ModelAbsoluteTolerance);
+                Brep[] result = Brep.CreateBooleanDifference(new Brep[] { chosenBody }, cutters, doc.ModelAbsoluteTolerance);
                 if (result != null && result.Length > 0)
-                    bodyBrep = result[0];
+                    chosenBody = result[0];
                 else
                     RhinoApp.WriteLine("Boolean difference failed — check that all Breps are closed solids");
 
@@ -248,13 +225,13 @@ namespace StullerHouse
                 var confirmResult = RhinoGet.GetString("Press Enter to confirm or Escape to cancel", true, ref confirm);
                 if (confirmResult == Result.Cancel) return confirmResult;
 
-                doc.Objects.AddBrep(bodyBrep, bodyAttrs);
-                if (joinedRoof == null || joinedRoof.Length == 0)
+                doc.Objects.AddBrep(chosenBody, bodyAttrs);
+                if (chosenRoof == null)
                 {
                     RhinoApp.WriteLine("Failed to join roof.");
                     return Result.Failure;
                 }
-                doc.Objects.AddBrep(joinedRoof[0], roofAttrs);
+                doc.Objects.AddBrep(chosenRoof, roofAttrs);
                 doc.Objects.AddBrep(doorBrep, doorAttrs);
                 doc.Objects.AddBrep(chimneyBrep, chimneyAttrs);
                 doc.Objects.AddBrep(windowLBrep, windowAttrs);
