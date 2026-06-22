@@ -2,6 +2,7 @@ using Rhino;
 using Rhino.Commands;
 using Rhino.Geometry;
 using Rhino.Input;
+using Rhino.Input.Custom;
 using System.ComponentModel;
 
 
@@ -25,6 +26,7 @@ namespace StullerHouse
             doc.Views.Redraw();
             try
             {
+
                 Point3d insertionPt = Point3d.Origin;
                 var rc = RhinoGet.GetPoint("House insertion point", true, out insertionPt);
                 if (rc != Result.Success) return rc;
@@ -36,28 +38,56 @@ namespace StullerHouse
                 conduit.PreviewRoof = BuildRoofPreview(insertionPt, width, depth, height, roofHeight, doc);
                 doc.Views.Redraw();
 
-                var wd = RhinoGet.GetNumber("House width", true, ref width);
-                if (wd != Result.Success) return wd;
-                conduit.PreviewBody = BuildBodyPreview(insertionPt, width, depth, height);
-                conduit.PreviewRoof = BuildRoofPreview(insertionPt, width, depth, height, roofHeight, doc);
-                doc.Views.Redraw();
+                OptionDouble OptionWidth = new OptionDouble(10, 1, 100);
+                OptionDouble OptionDepth = new OptionDouble(8, 1, 80);
+                OptionDouble OptionHeight = new OptionDouble(6, 1, 60);
+                OptionDouble OptionRoofHeight = new OptionDouble(5, 1, 50);
 
-                var dp = RhinoGet.GetNumber("House depth", true, ref depth);
-                if (dp != Result.Success) return dp;
-                conduit.PreviewBody = BuildBodyPreview(insertionPt, width, depth, height);
-                conduit.PreviewRoof = BuildRoofPreview(insertionPt, width, depth, height, roofHeight, doc);
-                doc.Views.Redraw();
 
-                var ht = RhinoGet.GetNumber("House wall height", true, ref height);
-                if (ht != Result.Success) return ht;
-                conduit.PreviewBody = BuildBodyPreview(insertionPt, width, depth, height);
-                conduit.PreviewRoof = BuildRoofPreview(insertionPt, width, depth, height, roofHeight, doc);
-                doc.Views.Redraw();
+                GetObject go = new GetObject();
+                go.SetCommandPrompt("Select surfaces, polysurfaces, or meshes");
 
-                var rh = RhinoGet.GetNumber("Roof height", true, ref roofHeight);
-                if (rh != Result.Success) return rh;
-                conduit.PreviewRoof = BuildRoofPreview(insertionPt, width, depth, height, roofHeight, doc);
-                doc.Views.Redraw();
+                go.AddOptionDouble("Width", ref OptionWidth);
+                go.AddOptionDouble("Depth", ref OptionDepth);
+                go.AddOptionDouble("Height", ref OptionHeight);
+                go.AddOptionDouble("RoofHeight", ref OptionRoofHeight);
+
+                while(true)
+                { 
+                    var previewResult = go.Get();
+
+                    if (previewResult == GetResult.Option)
+                        {
+                            go.EnablePreSelect(false,true);
+
+                            width = OptionWidth.CurrentValue;
+                            depth = OptionDepth.CurrentValue;
+                            height = OptionHeight.CurrentValue;
+                            roofHeight = OptionRoofHeight.CurrentValue;
+
+                            conduit.PreviewBody = BuildBodyPreview(insertionPt, width, depth, height);
+                            conduit.PreviewRoof = BuildRoofPreview(insertionPt, width, depth, height, roofHeight, doc);
+
+                            doc.Views.Redraw();
+                            continue;
+                        }
+
+                    else if (previewResult == GetResult.Object)
+                        {
+                            width = OptionWidth.CurrentValue;
+                            depth = OptionDepth.CurrentValue;
+                            height = OptionHeight.CurrentValue;
+                            roofHeight = OptionRoofHeight.CurrentValue;
+
+                            break;
+                        }
+
+                    else
+                        {
+                        return go.CommandResult();
+                        }
+                }
+
 
                 if (width <= 0 || depth <= 0 || height <= 0 || roofHeight <= 0)
                 {
